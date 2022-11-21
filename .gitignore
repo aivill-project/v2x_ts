@@ -1,5 +1,9 @@
+__pycache__/
 UCR/*
 export/*
+data/update/uncombine/*
+data/update/combine/*
+
 *.pth
 *.pkl
 *.npy
