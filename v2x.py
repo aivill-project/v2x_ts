@@ -113,7 +113,7 @@ class V2XData():
         print(f'X_sum shape: {X_sum.shape}, y_sum shape: {y_sum.shape}')
         return X_sum, y_sum, splits, df_sum
     
-DROP_COLS_L = ['ISSUE_DATE']
+DROP_COLS_L = ['ISSUE_DATE', 'VEHICLE_ID', 'VEHICLE_TYPE']
 
 class V2XDataLabeled(V2XData):
     def __init__(self, dataset_path = None, dataset_scenario: list = None, drop_cols: list = None, 
