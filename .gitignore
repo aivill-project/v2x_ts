@@ -10,3 +10,5 @@ data/update/combine/*
 *.pth
 *.pkl
 *.npy
+/data/raw/*
+/data/labeled/*
