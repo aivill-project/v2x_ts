@@ -3,6 +3,9 @@ UCR/*
 export/*
 data/update/uncombine/*
 data/update/combine/*
+/data/raw/*
+/data/labeled/*
+/wandb/*
 
 *.pth
 *.pkl

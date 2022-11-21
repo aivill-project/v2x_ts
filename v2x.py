@@ -22,14 +22,15 @@ INDEX_COL = "ISSUE_DATE"
 
 
 class V2XData():
-    def __init__(self, dataset_path = None, dataset_files: list = None, drop_cols: list = None, 
+    def __init__(self, dataset_path = None, dataset_scenario: list = None, drop_cols: list = None, 
                  target_cols: list = None, test_size: float = 0.5, random_state: int = None,
                  hazard_thr: int = 1):
         self.data_path = dataset_path
-        if dataset_files:
-            self.dataset_files = dataset_files.copy()
+        if dataset_scenario:
+            self.dataset_scenario = dataset_scenario.copy()
         else:
-            self.dataset_files = sorted(glob.glob(os.path.join(self.data_path, "*.csv")))
+            self.dataset_scenario = sorted(glob.glob(os.path.join(self.data_path, '*.csv')))
+        
         
         if not drop_cols:
             self.drop_cols = DROP_COLS.copy()    
@@ -43,18 +44,18 @@ class V2XData():
         
         self.test_size = test_size
         self.random_state = random_state
-        self.files_num = len(self.dataset_files)
+        self.files_num = len(self.dataset_scenario)
         
         if hazard_thr < 1:
             assert hazard_thr > 0, "hazard_thr must be greater than 0"
         else: 
             self.hazard_thr = hazard_thr
         
-        print(f"loaded {len(self.dataset_files)} files")
-        print(self.dataset_files[:5], "...")
+        print(f"loaded {len(self.dataset_scenario)} files")
+        print(self.dataset_scenario[:5], "...")
         
     def __getitem__(self, index, print_size=True):
-        df = pd.read_csv(self.dataset_files[index]).drop(labels = self.drop_cols, axis=1)
+        df = pd.read_csv(self.dataset_scenario[index]).drop(labels = self.drop_cols, axis=1)
         df.dropna(0, inplace = True)
         if print_size: print(f'df[{index}] shape: {df.shape}')
         # print(df.info())
@@ -93,7 +94,7 @@ class V2XData():
     def get_all_item(self, is_test = False, print_size=True):
         X_sum, y_sum = [], []
         df_sum = pd.DataFrame()
-        files_num = len(self.dataset_files)
+        files_num = len(self.dataset_scenario)
         if is_test == True:
             files_num = int(files_num - 0.2*files_num)
         print(f'files index: 0 ~ {files_num}')
@@ -112,3 +113,69 @@ class V2XData():
         print(f'X_sum shape: {X_sum.shape}, y_sum shape: {y_sum.shape}')
         return X_sum, y_sum, splits, df_sum
     
+DROP_COLS_L = ['ISSUE_DATE', 'VEHICLE_ID', 'VEHICLE_TYPE']
+
+class V2XDataLabeled(V2XData):
+    def __init__(self, dataset_path = None, dataset_scenario: list = None, drop_cols: list = None, 
+                 target_cols: list = None, test_size: float = 0.5, random_state: int = None):
+        super().__init__(dataset_path, dataset_scenario, drop_cols, target_cols, test_size, random_state)
+        if dataset_scenario:
+            self.dataset_scenario = dataset_scenario.copy()
+        else:
+            self.dataset_scenario = sorted(glob.glob(os.path.join(self.data_path, '*')))
+        self.dataset_scenario = [file for file in self.dataset_scenario if os.path.isdir(file)]
+        
+        self.drop_cols = DROP_COLS_L.copy()
+        
+        print(f"loaded {len(self.dataset_scenario)} scenarios")
+        print(self.dataset_scenario[:5], "...")
+            
+        
+    def __getitem__(self, index, print_size=True):
+        csv_files = sorted(glob.glob(os.path.join(self.dataset_scenario[index], '*.csv')))
+        json_files = sorted(glob.glob(os.path.join(self.dataset_scenario[index], '*.json')))
+        
+        df = pd.DataFrame()
+        X = []
+        for csv_file in csv_files:
+            read_df = pd.read_csv(csv_file)
+            df = pd.concat([df, read_df])
+            X.append(read_df.drop(labels = self.drop_cols, axis=1).values)
+        X = np.array(X)
+        X = np.array([scene.transpose() for scene in X])
+        
+        df.fillna(0, inplace = True)
+        
+        y = []
+        for json_file in json_files:
+            with open(json_file, 'r') as f:
+                json_data = json.load(f)
+                y.append(json_data["Annotation"]['Turn'])
+        
+        y = np.array(y)
+        
+        splits = self.get_splits(X, test_size = self.test_size, random_state = self.random_state)
+        
+        return X, y, splits, df
+    
+    def get_all_item(self, is_test = False, print_size=True):
+        X_sum, y_sum = [], []
+        df_sum = pd.DataFrame()
+        files_num = len(self.dataset_scenario)
+        if is_test == True:
+            files_num = int(files_num - 0.2*files_num)
+        print(f'files index: 0 ~ {files_num}')
+        
+        for idx in tqdm(range(files_num)):
+            X, y, _, df = self.__getitem__(idx, print_size=False)
+            X_sum.append(X)
+            y_sum.append(y)
+            df_sum = pd.concat([df_sum, df])
+            
+            
+        X_sum = np.concatenate(X_sum)
+        y_sum = np.concatenate(y_sum)
+        df_sum.reset_index(drop=True, inplace=True)
+        splits = self.get_splits(X_sum, test_size = self.test_size, random_state = self.random_state)
+        print(f'X_sum shape: {X_sum.shape}, y_sum shape: {y_sum.shape}')
+        return X_sum, y_sum, splits, df_sum
