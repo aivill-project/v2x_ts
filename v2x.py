@@ -150,7 +150,7 @@ class V2XDataLabeled(V2XData):
         for json_file in json_files:
             with open(json_file, 'r') as f:
                 json_data = json.load(f)
-                y.append(json_data["Annotation"]['Hazard'])
+                y.append(json_data["Annotation"]['Turn'])
         
         y = np.array(y)
         
