@@ -12,11 +12,16 @@ from modules.utils import plot_confusion_matrix
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--class_name", type=str, default="False", help="turn, lane, speed, hazard")
+parser.add_argument("--continue_test", type=str, default="False", help="path to the previous log file to continue inference from the last index")
 args = parser.parse_args()
+
+if args.continue_test:
+    args.class_name = args.continue_test.split(".")[0].split("_")[-3]
 
 LOG_START_TIME = datetime.now().strftime('%Y%m%d_%H%M%S')
 DATANUM = 900000
 AVERAGE = "micro"
+LOG_START_INX = 0
 
 # load data 20220801 ~ 20220831
 X, y = np.load("data/X_sum_all.npy"), np.load("data/y_sum_all.npy")
@@ -89,16 +94,18 @@ def get_preds_csv(learner, classes):
 
     df = pd.DataFrame(columns=["Target", "Prediction", "Recall", "Precision", "F1_Score"])
     
-    write_txt_log("=====================================")
-    write_txt_log("Time Series Classification Report")
-    with open(f"output/result_{args.class_name}_{LOG_START_TIME}.txt", "a") as f:
-        sys.stdout = f
-        print(skm.classification_report(test_targets, test_preds, target_names=list(classes.values()), zero_division=0, digits=4))
-        sys.stdout = sys.__stdout__
     
-    start_log(classes)
-    
-    for idx in range(len(test_targets)):
+    if not args.continue_test:
+        write_txt_log("=====================================")
+        write_txt_log("Time Series Classification Report")
+        with open(f"output/result_{args.class_name}_{LOG_START_TIME}.txt", "a") as f:
+            sys.stdout = f
+            print(skm.classification_report(test_targets, test_preds, target_names=list(classes.values()), zero_division=0, digits=4))
+            sys.stdout = sys.__stdout__
+        
+            start_log(classes)
+        
+    for idx in range(LOG_START_INX, len(test_targets)):
         target_class, pred_class = classes[int(test_targets[idx])], classes[int(test_preds[idx])]
         test_precision = round(skm.precision_score(test_targets[:idx+1], test_preds[:idx+1], average = f"{AVERAGE}"), 4)
         test_recall = round(skm.recall_score(test_targets[:idx+1], test_preds[:idx+1], average = f"{AVERAGE}"), 4)
@@ -130,16 +137,19 @@ def load_model_v2x(arg):
     
     if arg == "turn":
         classes = {0: "False", 1: "Right", 2: "Left", 3: "Reverse"}
-        write_txt_log(f"Turn counter: {' '.join(f'{k}: {v}' for k, v in ct_turn.items())}")
-        write_txt_log(f"Turn percentage: {' '.join(f'{k}: {v / DATANUM:.4f}' for k, v in ct_turn.items())}")
+        if args.continue_test == False:
+            write_txt_log(f"{arg.title()} counter: {' '.join(f'{k}: {v}' for k, v in ct_turn.items())}")
+            write_txt_log(f"{arg.title()} percentage: {' '.join(f'{k}: {v / DATANUM:.4f}' for k, v in ct_turn.items())}")
     elif arg == "speed":
         classes = {0: "False", 1: "Acc", 2: "Hbrk"}
-        write_txt_log(f"Speed counter: {' '.join(f'{k}: {v}' for k, v in ct_speed.items())}")
-        write_txt_log(f"Speed percentage: {' '.join(f'{k}: {v / DATANUM:.4f}' for k, v in ct_speed.items())}")
+        if args.continue_test == False:
+            write_txt_log(f"{arg.title()} counter: {' '.join(f'{k}: {v}' for k, v in ct_speed.items())}")
+            write_txt_log(f"{arg.title()} percentage: {' '.join(f'{k}: {v / DATANUM:.4f}' for k, v in ct_speed.items())}")
     elif arg == "hazard":
         classes = {0: "False", 1: "True"}
-        write_txt_log(f"Hazard counter: {' '.join(f'{k}: {v}' for k, v in ct_hazard.items())}")
-        write_txt_log(f"Hazard percentage: {' '.join(f'{k}: {v / DATANUM:.4f}' for k, v in ct_hazard.items())}")
+        if args.continue_test == False:
+            write_txt_log(f"{arg.title()} counter: {' '.join(f'{k}: {v}' for k, v in ct_hazard.items())}")
+            write_txt_log(f"{arg.title()} percentage: {' '.join(f'{k}: {v / DATANUM:.4f}' for k, v in ct_hazard.items())}")
     else :
         write_txt_log("Wrong class name")
         assert print("Wrong class name")
@@ -148,12 +158,24 @@ def load_model_v2x(arg):
     return learner, classes
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser() # argument parser
-    parser.add_argument("--class_name", type = str, default = "turn", help = "turn or speed")
-    args = parser.parse_args()
     
-    write_txt_log(f"python v2x_exc.py --class_name {args.class_name}") # 실행 명령어 기록 
+    # 로그 중간 시작 시
+    if args.continue_test:
+        LOG_START_TIME = "_".join(args.continue_test.split(".")[0].split("_")[-2:])
+        
+        with open(args.continue_test, "r") as f:
+            lines = f.readlines()
+            idx_start = lines[-1].find('[', 1)
+            idx_end = lines[-1].find(']', idx_start)
+            LOG_START_INX = int(lines[-1][idx_start+1:idx_end])
+        
+        # 로그 파일 이름이 잘못된 경우 확인
+        if not os.path.exists(args.continue_test):
+            write_txt_log("Wrong log file name to continue test.")
+            assert print("Wrong log file name to continue test.")
+            exit()
+    else:
+        write_txt_log(f"python v2x_exc.py --class_name {args.class_name}") # 실행 명령어 기록 
     
     learner, classes = load_model_v2x(args.class_name) # 모델 불러오기
     get_preds_csv(learner, classes) # 결과 로그 및 excel 파일 생성
-    
