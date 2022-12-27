@@ -1,0 +1,7 @@
+tsai
+pandas
+numpy
+glob
+wandb
+matplotlib
+scikit-learn

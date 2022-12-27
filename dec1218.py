@@ -1,4 +1,4 @@
-from v2x import V2XData, V2XDataLabeled
+from modules.v2x import V2XData, V2XDataLabeled
 from sklearn.metrics import accuracy_score, precision_score, recall_score, confusion_matrix, f1_score
 import sklearn.metrics as skm
 from tsai.all import *

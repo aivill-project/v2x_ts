@@ -1,0 +1,159 @@
+from tsai.all import *
+import sklearn.metrics as skm
+import numpy as np
+import pandas as pd
+import sys
+import argparse
+from matplotlib import pyplot as plt
+from collections import Counter
+from datetime import datetime
+
+from modules.utils import plot_confusion_matrix
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--class_name", type=str, default="False", help="turn, lane, speed, hazard")
+args = parser.parse_args()
+
+LOG_START_TIME = datetime.now().strftime('%Y%m%d_%H%M%S')
+DATANUM = 900000
+AVERAGE = "micro"
+
+# load data 20220801 ~ 20220831
+X, y = np.load("data/X_sum_all.npy"), np.load("data/y_sum_all.npy")
+y_turn, y_lane, y_speed, y_hazard = y[:, 0], y[:, 1], y[:, 2], y[:, 3]
+
+ct_turn, ct_lane, ct_speed, ct_hazard = Counter(y_turn), Counter(y_lane), Counter(y_speed), Counter(y_hazard)
+
+def start_log(classes: dict):
+    write_txt_log("=====================================")
+    write_txt_log(f"Test data length: 180000")
+    write_txt_log(f"Class types: {classes}")
+    write_txt_log("=====================================")
+    write_txt_log("V2X Time Series Classification Result")
+    write_txt_log(f"Average: {AVERAGE}")
+    write_txt_log(f"idx: Target, Prediction, Precision, Recall, F1_Score")
+
+def write_txt_log(*args_method):
+    with open(f"output/result_{args.class_name}_{LOG_START_TIME}.txt", "a") as f:
+        current_time = datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+        for arg in args_method:
+            print(f"[{current_time}] {arg}")
+            f.writelines(f"[{current_time}] {arg}\n")
+
+# 0: False, 1: Right, 2: Reverse, 3: Left -> 0: False, 1: Right, 2: Left, 3: Reverse
+def permute_turn(test_targets, test_preds):
+    test_targets = test_targets.tolist()
+    test_preds = test_preds.tolist()
+
+    for idx in range(len(test_targets)):
+        if test_targets[idx] == 3:
+            test_targets[idx] = 2
+        elif test_targets[idx] == 2:
+            test_targets[idx] = 3
+
+    for idx in range(len(test_preds)):
+        if test_preds[idx] == 3:
+            test_preds[idx] = 2
+        elif test_preds[idx] == 2:
+            test_preds[idx] = 3
+    return test_targets, test_preds
+
+# 0: Acc, 1: False, 2: Hbrk -> 0: False, 1: Acc, 2: Hbrk
+def permute_speed(test_targets, test_preds):
+    test_targets = test_targets.tolist()
+    test_preds = test_preds.tolist()
+
+    for idx in range(len(test_targets)):
+        if test_targets[idx] == 0:
+            test_targets[idx] = 1
+        elif test_targets[idx] == 1:
+            test_targets[idx] = 0
+
+    for idx in range(len(test_preds)):
+        if test_preds[idx] == 0:
+            test_preds[idx] = 1
+        elif test_preds[idx] == 1:
+            test_preds[idx] = 0
+    return test_targets, test_preds
+
+def get_preds_csv(learner, classes):
+    dls = learner.dls
+    valid_dl = dls.valid
+
+    # inference
+    _, test_targets, test_preds = learner.get_preds(dl=valid_dl, with_decoded=True, save_preds=None, save_targs=None)
+    if args.class_name == "turn":
+        test_targets, test_preds = permute_turn(test_targets, test_preds)
+    elif args.class_name == "speed":
+        test_targets, test_preds = permute_speed(test_targets, test_preds)
+
+    df = pd.DataFrame(columns=["Target", "Prediction", "Recall", "Precision", "F1_Score"])
+    
+    write_txt_log("=====================================")
+    write_txt_log("Time Series Classification Report")
+    with open(f"output/result_{args.class_name}_{LOG_START_TIME}.txt", "a") as f:
+        sys.stdout = f
+        print(skm.classification_report(test_targets, test_preds, target_names=list(classes.values()), zero_division=0, digits=4))
+        sys.stdout = sys.__stdout__
+    
+    start_log(classes)
+    
+    for idx in range(len(test_targets)):
+        target_class, pred_class = classes[int(test_targets[idx])], classes[int(test_preds[idx])]
+        test_precision = round(skm.precision_score(test_targets[:idx+1], test_preds[:idx+1], average = f"{AVERAGE}"), 4)
+        test_recall = round(skm.recall_score(test_targets[:idx+1], test_preds[:idx+1], average = f"{AVERAGE}"), 4)
+        test_f1 = round(skm.f1_score(test_targets[:idx+1], test_preds[:idx+1], average = f"{AVERAGE}"), 4)
+        
+        write_txt_log(f"[{idx+1}] target: {target_class}, pred: {pred_class}, precision: {test_precision}, recall: {test_recall}, f1 score: {test_f1}")
+        
+        df.loc[idx+1] = [target_class, pred_class, test_precision, test_recall, test_f1]
+
+    write_txt_log("Confusion Matrix")
+    with open(f"output/result_{args.class_name}_{LOG_START_TIME}.txt", "a") as f:
+        sys.stdout = f
+        print(skm.confusion_matrix(test_targets, test_preds))
+        sys.stdout = sys.__stdout__
+    
+    plot_confusion_matrix(test_targets, test_preds, classes=list(classes.values()), normalize=True, title='Normalized confusion matrix').savefig(f"output/confusion_matrix_{args.class_name}_{LOG_START_TIME}_{int(True)}.png")
+    plot_confusion_matrix(test_targets, test_preds, classes=list(classes.values()), normalize=False, title='Confusion matrix').savefig(f"output/confusion_matrix_{args.class_name}_{LOG_START_TIME}_{int(False)}.png")
+    df.to_excel(f"output/result_{args.class_name}_{LOG_START_TIME}.xlsx", index=False)
+    df.to_csv(f"output/result_{args.class_name}_{LOG_START_TIME}.csv", index=False)
+    
+    write_txt_log("")
+    write_txt_log("")
+            
+
+def load_model_v2x(arg):
+    models_folder = {"turn": "turn_20221226_0955", 
+                     "speed": "speed_20221226_1202", 
+                     "hazard": "hazard_20221226_1809"} # 모델 저장 폴더
+    
+    if arg == "turn":
+        classes = {0: "False", 1: "Right", 2: "Left", 3: "Reverse"}
+        write_txt_log(f"Turn counter: {' '.join(f'{k}: {v}' for k, v in ct_turn.items())}")
+        write_txt_log(f"Turn percentage: {' '.join(f'{k}: {v / DATANUM:.4f}' for k, v in ct_turn.items())}")
+    elif arg == "speed":
+        classes = {0: "False", 1: "Acc", 2: "Hbrk"}
+        write_txt_log(f"Speed counter: {' '.join(f'{k}: {v}' for k, v in ct_speed.items())}")
+        write_txt_log(f"Speed percentage: {' '.join(f'{k}: {v / DATANUM:.4f}' for k, v in ct_speed.items())}")
+    elif arg == "hazard":
+        classes = {0: "False", 1: "True"}
+        write_txt_log(f"Hazard counter: {' '.join(f'{k}: {v}' for k, v in ct_hazard.items())}")
+        write_txt_log(f"Hazard percentage: {' '.join(f'{k}: {v / DATANUM:.4f}' for k, v in ct_hazard.items())}")
+    else :
+        write_txt_log("Wrong class name")
+        assert print("Wrong class name")
+    
+    learner = load_learner_all(path=f"models/{models_folder[arg]}", dls_fname=f'dls_{arg}', model_fname=f'model_{arg}_MLSTM_FCNPlus', learner_fname=f'learner_{arg}')
+    return learner, classes
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser() # argument parser
+    parser.add_argument("--class_name", type = str, default = "turn", help = "turn or speed")
+    args = parser.parse_args()
+    
+    write_txt_log(f"python v2x_exc.py --class_name {args.class_name}") # 실행 명령어 기록 
+    
+    learner, classes = load_model_v2x(args.class_name) # 모델 불러오기
+    get_preds_csv(learner, classes) # 결과 로그 및 excel 파일 생성
+    
