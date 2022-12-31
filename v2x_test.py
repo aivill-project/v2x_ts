@@ -13,14 +13,15 @@ from modules.utils import plot_confusion_matrix
 parser = argparse.ArgumentParser()
 parser.add_argument("--class_name", type=str, default="False", help="turn, lane, speed, hazard")
 parser.add_argument("--continue_test", type=str, default="False", help="path to the previous log file to continue inference from the last index")
+parser.add_argument("--average", type=str, default="macro", help="macro, micro, weighted")
 args = parser.parse_args()
 
-if args.continue_test:
+if args.continue_test != "False":
     args.class_name = args.continue_test.split(".")[0].split("_")[-3]
 
 LOG_START_TIME = datetime.now().strftime('%Y%m%d_%H%M%S')
 DATANUM = 900000
-AVERAGE = "micro"
+AVERAGE = "macro"
 LOG_START_INX = 0
 
 # load data 20220801 ~ 20220831
@@ -93,7 +94,7 @@ def get_preds_csv(learner, classes):
         test_targets, test_preds = permute_speed(test_targets, test_preds)
 
     df = pd.DataFrame(columns=["Target", "Prediction", "Recall", "Precision", "F1_Score"])
-    
+    df_rows = []
     
     if not args.continue_test:
         write_txt_log("=====================================")
@@ -113,7 +114,9 @@ def get_preds_csv(learner, classes):
         
         write_txt_log(f"[{idx+1}] target: {target_class}, pred: {pred_class}, precision: {test_precision}, recall: {test_recall}, f1 score: {test_f1}")
         
-        df.loc[idx+1] = [target_class, pred_class, test_precision, test_recall, test_f1]
+        df_rows.append([target_class, pred_class, test_precision, test_recall, test_f1])
+        
+    df = df.append(df_rows, ignore_index=True)
 
     write_txt_log("Confusion Matrix")
     with open(f"output/result_{args.class_name}_{LOG_START_TIME}.txt", "a") as f:
@@ -137,17 +140,17 @@ def load_model_v2x(arg):
     
     if arg == "turn":
         classes = {0: "False", 1: "Right", 2: "Left", 3: "Reverse"}
-        if args.continue_test == False:
+        if args.continue_test == "False":
             write_txt_log(f"{arg.title()} counter: {' '.join(f'{k}: {v}' for k, v in ct_turn.items())}")
             write_txt_log(f"{arg.title()} percentage: {' '.join(f'{k}: {v / DATANUM:.4f}' for k, v in ct_turn.items())}")
     elif arg == "speed":
         classes = {0: "False", 1: "Acc", 2: "Hbrk"}
-        if args.continue_test == False:
+        if args.continue_test == "False":
             write_txt_log(f"{arg.title()} counter: {' '.join(f'{k}: {v}' for k, v in ct_speed.items())}")
             write_txt_log(f"{arg.title()} percentage: {' '.join(f'{k}: {v / DATANUM:.4f}' for k, v in ct_speed.items())}")
     elif arg == "hazard":
         classes = {0: "False", 1: "True"}
-        if args.continue_test == False:
+        if args.continue_test == "False":
             write_txt_log(f"{arg.title()} counter: {' '.join(f'{k}: {v}' for k, v in ct_hazard.items())}")
             write_txt_log(f"{arg.title()} percentage: {' '.join(f'{k}: {v / DATANUM:.4f}' for k, v in ct_hazard.items())}")
     else :
@@ -160,7 +163,7 @@ def load_model_v2x(arg):
 if __name__ == "__main__":
     
     # 로그 중간 시작 시
-    if args.continue_test:
+    if args.continue_test != "False":
         LOG_START_TIME = "_".join(args.continue_test.split(".")[0].split("_")[-2:])
         
         with open(args.continue_test, "r") as f:
