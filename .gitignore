@@ -6,6 +6,11 @@ data/update/combine/*
 /data/raw/*
 /data/labeled/*
 /wandb/*
+/data/1-Cycle/*
+/data/Sejong/*
+
+/data/3.1-Cycle.zip
+/data/50-1_Sejong.zip
 
 *.pth
 *.pkl
@@ -14,7 +19,6 @@ data/update/combine/*
 /data/labeled/*
 1-Cycle/
 Sejong/
-3.1-Cycle.zip
-50-1_Sejong.zip
 data/logs/220901.zip
-models/*
+models/dls.pth
+models/dls_speed.pth
