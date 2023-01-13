@@ -2,10 +2,9 @@ FROM ubuntu:18.04
 
 WORKDIR /home/
 
-RUN mkdir /home/50-1_v2x
-RUN cd /home/50-1_v2x
+RUN git clone https://github.com/a22106/v2x_ts.git 50-1_v2x
 
-COPY . ./
+# COPY . ./
 
 RUN apt-get update
 RUN apt-get install wget git -y
@@ -22,3 +21,12 @@ RUN apt-get install python3-pip
 RUN pip install --upgrade pip
 RUN pip install tsai
 RUN pip install numpy==1.23 IPython ipykernel
+
+
+
+WORKDIR /home/50-1_v2x
+COPY ./data/X_sum_all.npy ./data/X_sum_all.npy
+COPY ./data/y_sum_all.npy ./data/y_sum_all.npy
+COPY ./models/turn_20221226_0955 ./models/turn_20221226_0955
+COPY ./models/speed_20221226_1202 ./models/speed_20221226_1202
+COPY ./models/hazard_20221226_1809 ./models/hazard_20221226_1809
