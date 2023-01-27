@@ -8,6 +8,7 @@ data/update/combine/*
 /wandb/*
 /data/1-Cycle/*
 /data/Sejong/*
+/data/final/*
 
 /data/3.1-Cycle.zip
 /data/50-1_Sejong.zip
@@ -15,6 +16,7 @@ data/update/combine/*
 *.pth
 *.pkl
 *.npy
+*.zip
 /data/raw/*
 /data/labeled/*
 1-Cycle/
