@@ -4,4 +4,7 @@ numpy
 glob
 wandb
 matplotlib
-scikit-learn
+scikit-learn==1.1.3
+torch
+opencv-python
+scipy

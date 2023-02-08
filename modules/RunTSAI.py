@@ -46,25 +46,6 @@ class RunTSAI():
         learn.recorder.plot_metrics()
         learn.save_all('classification')
         return learn
-    
-    @staticmethod
-    def multivariate_classification(X, y, splits, config=config_default, metrics=accuracy, lr_find=False, load_ckpt = False
-                                    , save: str = 'multivariate_classification'):
-        "model_input: LSTM, LSTMPlus, MLSTM_Plus, LSTM_FCN"
-        
-        tfms = [None, [TSCategorize()]]
-        check_data(X, y, splits=splits)
-        dsets = TSDatasets(X, y, tfms=tfms, splits=splits)
-        dls = TSDataLoaders.from_dsets(dsets.train, dsets.valid, bs=256, batch_tfms=config["batch_tfms"])
-        
-        m = create_model(config["architecture"], dls = dls)
-        learn = Learner(dls, m, metrics=metrics)
-        if lr_find:
-            learn.lr_find()
-        learn.fit(config["n_epochs"], config["lr"], cbs=SaveModel(monitor='accuracy', fname=save))
-        learn.recorder.plot_metrics()
-        learn.save('classification')
-        return learn
 
     @staticmethod
     def multivariate_classification_wandb(X, y, splits, metrics=accuracy, config = config_default, proj_name = "50-1 V2X TSClassification", lr_find=False, load_ckpt = False
