@@ -26,3 +26,4 @@ models/dls.pth
 models/dls_speed.pth
 data/*
 models/*
+.preprocessing.py.swp

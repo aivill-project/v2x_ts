@@ -13,11 +13,7 @@ from sklearn.model_selection import train_test_split
 from tsai.basics import *
 from tsai.data.external import *
 from tsai.data.preprocessing import *
-from torch.utils.data import DataLoader, Dataset
 import numpy as np
-import wandb
-my_setup(wandb)
-wandb.login()
 
 config_default = AttrDict(
     batch_tfms = TSStandardize(by_sample=True),
