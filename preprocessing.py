@@ -22,8 +22,13 @@ class V2XPreprocessing:
     
     @staticmethod
     def get_file_list(data_dir) -> Tuple[List[str], List[str]]:
-        csv_files = [str(p) for p in pl.Path(data_dir).rglob("*.csv")]
-        json_files = [str(p) for p in pl.Path(data_dir).rglob("*.json")]
+        # if data_dir is a folder, return all csv and json files in the folder
+        csv_files, json_files = [], []
+        for file in pl.data_dir.rglob("*"):
+            if file.suffix == ".csv":
+                csv_files.append(str(file))
+            elif file.suffix == ".json":
+                json_files.append(str(file))
         return csv_files, json_files
     
     @staticmethod
