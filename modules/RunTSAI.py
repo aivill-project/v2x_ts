@@ -42,6 +42,40 @@ class RunTSAI():
         learn.recorder.plot_metrics()
         learn.save_all('classification')
         return learn
+    
+    @staticmethod
+    def multiclass_classification(X, y, split, config, save_path:str = None):
+        y=y.tolist()
+
+        tfms = [None, [Categorize]]
+        dsets = TSDatasets(X, y, tfms=tfms, splits=split, inplace=True)
+        dls = TSDataLoaders.from_dsets(dsets.train, dsets.valid, bs=[64, 128], 
+                                    batch_tfms=config["batch_tfms"], num_workers=0)
+        model = create_model(config["architecture"], dls=dls)
+        learn = Learner(dls, model, metrics=[accuracy, F1Score(average='macro'), Precision(average='macro'), Recall(average='macro')])
+
+        # Train model
+        learn.fit_one_cycle(config["n_epochs"])
+        learn.recorder.plot_metrics()
+        
+        # is save
+        if save_path:
+            learn.save_all(save_path)
+        return learn
+    
+    @staticmethod
+    def target_label_counter(y):
+        result = []
+        for i in range(len(y[0])):
+            result.append(Counter(y[:,i]))
+            print(result[-1])
+        return result
+    
+    @staticmethod
+    def plot_confusion_matrix(learn, title:str = None):
+        interp = ClassificationInterpretation.from_learner(learn)
+        interp.plot_confusion_matrix(title=f'{title} (Unnormalized)')
+        interp.plot_confusion_matrix(normalize=True, title=f'{title} (Normalized)')
 
     @staticmethod
     def multivariate_classification_wandb(X, y, splits, metrics=accuracy, config = config_default, proj_name = "50-1 V2X TSClassification", lr_find=False, load_ckpt = False
